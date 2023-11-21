@@ -1,4 +1,4 @@
-# Deploying a Streamlit application in AWS: An end-to-end tutorial
+# Deploying a Streamlit application on AWS: An end-to-end tutorial
 
 It's a simple application that is currently using Stream as the front-end. I will show you can take this existing Streamlit app and deploy it on AWS 
 
