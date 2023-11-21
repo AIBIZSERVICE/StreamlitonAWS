@@ -38,11 +38,11 @@ It's a simple application that is currently using Stream as the front-end. I wil
 
 2. Install all the packages/dependencies
 
-After all the above steps you should be able to see the ubuntu prompt for the virtual machine. We will need to set up this machine to run our app. I am going to be using this app for the demonstration purposes
+After all the above steps one should be able to see the ubuntu prompt for the virtual machine. We will need to set up this machine to run our app. I am going to be using this app for the demonstration purposes
 
 ```
-$ git clone https://github.com/upendrak/streamlit-aws-tutorial.git
-$ cd streamlit-aws-tutorial
+$ git clone https://github.com/AIBIZSERVICE/StreamlitonAWS.git
+$ cd StreamlitonAWS
 ```
 
 ```
@@ -50,7 +50,9 @@ $ sudo apt update
 $ sudo apt get install -y python3-pip
 $ pip3 install -r requirements.txt
 $ export PATH=~/.local/bin/:$PATH
-```
+$ echo "export OPENAI_API_KEY='yourkey'" >> ~/.zsh
+$ source ~/.zsh
+$ echo $OPENAI_API_KEY
 
 Once the dependencies are installed without any errors, your machine is now prepped and ready to run.
 
