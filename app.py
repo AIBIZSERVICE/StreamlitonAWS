@@ -1,44 +1,116 @@
+#Streamlit, a framework for building interactive web applications.
+#It provides functions for creating UIs, displaying data, and handling user inputs.
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly_express as px
+from langchain import HuggingFaceHub
 
-st.markdown("<h1 style='text-align: left; color: green;'>Club and Nationality App</h1>", unsafe_allow_html=True)
-st.write("")
+#This module provides a way to interact with the operating system, such as accessing environment variables, working with files
+#and directories, executing shell commands, etc
+import pypdf
+import os
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
-@st.cache
-def load_data():
-	df = pd.read_csv("football_data.csv")
-	df.drop(['Unnamed: 0', 'ID'], axis = 1, inplace=True)
-	return df
+# An embedding is a vector (list) of floating point numbers. The distance between two vectors measures their relatedness. 
+# Small distances suggest high relatedness and large distances suggest low relatedness.
+# Generate Text Embedding using different LLM
+from langchain.llms import OpenAI
+from langchain.embeddings import OpenAIEmbeddings
+#from langchain.embeddings.openai import OpenAIEmbeddings
 
-if st.checkbox("Select this checkbox to look at the data"):
-	st.write(load_data())
+#FAISS is an open-source library developed by Facebook AI Research for efficient similarity search and 
+#clustering of large-scale datasets, particularly with high-dimensional vectors. 
+#It provides optimized indexing structures and algorithms for tasks like nearest neighbor search and recommendation systems.
+from langchain.vectorstores import FAISS
 
-df = load_data()
+#By st.set_page_config(), you can customize the appearance of your Streamlit application's web page
+st.set_page_config(page_title="Advice Seeking", page_icon=":robot:")
+st.header("Good Morning... Sir/Madam, it is difficult to raise a child with speciality, I wish I can help")
 
-clubs = st.sidebar.multiselect('Select Players for clubs', df['Club'].unique())
-nationalities = st.sidebar.multiselect('Select Players from Nationalities', df['Nationality'].unique())
+#The below snippet helps us to import structured pdf file data for our tasks
+from langchain.document_loaders import PyPDFDirectoryLoader
 
-new_df = df[(df['Club'].isin(clubs)) & (df['Nationality'].isin(nationalities))]
+def load_docs(directory):
+    for filename in os.listdir(directory):
+        # Loads PDF files available in a directory with pypdf
+        if filename.endswith('.pdf'):
+            return load_docspdf(directory)
+        # Passing the directory to the 'load_docs' function
+        elif filename.endswith('.xlsx'):
+            return load_docsexcel(directory)
+        else:
+            print(f"Unsupported file format: {filename}")
 
+def load_docspdf(directory):
+    for filename in os.listdir(directory):
+        if filename.endswith('.pdf'):
+            loader = PyPDFDirectoryLoader(directory)
+            documents = loader.load()
+    return documents
 
-if clubs and nationalities is not None:
-	if len(new_df) != 0:
-		st.write("Summary of the selected combination of club and nationality:")
-		st.write(new_df)
-		st.write("Simple chart between player age and overall age of all the players")
-		fig = px.scatter(new_df, x ='Overall',y='Age', color='Name')
-		st.plotly_chart(fig)
-	else:
-		# st.markdown("### No player with that combination was found!!!")
-		st.markdown(
-		"""
+#Assigning the data inside the pdf to our variable here
+# Passing the directory to the 'load_docs' function
+directory = '/workspaces/SEN_embedded/data'
+documents = load_docs(directory)
 
-		This very simple webapp allows you to select and visualize players from certain clubs and certain nationalities
+len(documents)
 
-		👈 Select one or more clubs and nationalities
+#This function will split the documents into chunks
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-		"""
-		)
+def split_docs(documents, chunk_size=3000, chunk_overlap=20):
+  text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+  docs = text_splitter.split_documents(documents)
+  return docs
 
+docs = split_docs(documents)
+
+# Initialize the OpenAIEmbeddings object
+# Using OpenAI specified models
+#embeddings = OpenAIEmbeddings(model_name="text-embedding-ada-002")  
+# OR Using Hugging Face LLM for creating Embeddings for documents/Text
+#from langchain.embeddings import HuggingFaceEmbeddings, SentenceTransformerEmbeddings
+#embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+
+embeddings = OpenAIEmbeddings()
+
+#Store and Index vector space
+db = FAISS.from_documents(docs, embeddings)
+
+# LLM Q&A Code
+from langchain.llms import OpenAI
+from langchain.chains.question_answering import load_qa_chain
+from langchain.schema import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage
+)
+llm = OpenAI()
+chain = load_qa_chain(llm, chain_type="stuff")
+
+# This function will transform the question that we raise into input text to search relevant docs
+def get_text():
+    input_text = st.text_input("Parent: ", key = input)
+    return input_text
+
+#This function will help us in fetching the top k relevent documents from our vector store - Pinecone
+def get_similiar_docs(query, k=2):
+    similar_docs = db.similarity_search(query, k=k)
+    return similar_docs
+
+# This function will help us get the answer from the relevant docs matching input text
+def get_answer(query):
+  relevant_docs = get_similiar_docs(query)
+  print(relevant_docs)
+  response = chain.run(input_documents=relevant_docs, question=query)
+  return response
+
+if "sessionMessages" not in st.session_state:
+     st.session_state.sessionMessages = [
+        SystemMessage(content=" It is wished we are helpful assistants.")
+    ]
+input_text = get_text()
+submit = st.button('Generate')  
+
+if submit:
+    response = get_answer(input_text)
+    st.subheader("Answer:")
+    st.write(response,key= 1)
